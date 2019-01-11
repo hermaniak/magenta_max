@@ -1,0 +1,20 @@
+{
+  "name": "Magenta_max",
+  "version": "1.0.0",
+  "description": "Magenta integreation to max",
+  "main": "hai.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@magenta/music": "file:node_modules/@magenta/music",
+    "browser-env": "^3.2.5",
+    "http-server": "^0.11.1",
+    "node-fetch": "^2.3.0",
+    "performance-now": "^2.1.0",
+    "step-sequencer": "^0.1.1",
+    "web-audio-api": "^0.2.2"
+  }
+}
