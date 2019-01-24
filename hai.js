@@ -7,6 +7,7 @@ typeof window;
 // 'object'
 
 var now = require("performance-now")
+const { exec } = require('child_process');
 
 const Max = require('max-api');
 Max.post(" -- load magenta");
@@ -14,7 +15,7 @@ const mm = require('@magenta/music');
 	Max.post(" -- load tensorflow");
 const tf = require('@tensorflow/tfjs-core');
 var stepSequencer = require("./sequencer");
-
+const recorder = require("@magenta/music/es5/core/recorder");
 Max.post(" -- magenta fully loaded");
 
 // Instantiate a new StepSequencer object
@@ -30,6 +31,14 @@ const MEL_CHECKPOINT = `${CHECKPOINTS_DIR}/music_rnn/basic_rnn`;
 const DRUMS_CHECKPOINT = `${CHECKPOINTS_DIR}/music_rnn/drum_kit_rnn`;
 const IMPROV_CHECKPOINT = `${CHECKPOINTS_DIR}/music_rnn/chord_pitches_improv`;
 
+var NS_HEADER = {
+    ticksPerQuarter: 220,
+    totalTime: 1.5,
+    timeSignatures: [{ time: 0, numerator: 4, denominator: 4 }],
+    tempos: [{ time: 0, qpm: 120 }]
+	};
+	
+	
 var MELODY_NS = {
     ticksPerQuarter: 220,
     totalTime: 1.5,
@@ -115,18 +124,30 @@ var DRUMS_NS = {
     ]
 };
 
+function startFileServer(){
+	Max.post('start fileserver');
+	exec('/Users/hermannbauerecker/Music/HAI/max/node_modules/http-server/bin/http-server /Users/hermannbauerecker/file-serve', (err, stdout, stderr) => {
+  	if (err) {
+    	Max.post('fileserver stopped with error ' + err);
+    	return;
+  	}
+
+  	// the *entire* stdout and stderr (buffered)
+  	Max.post(`stdout: ${stdout}`);
+  	Max.post(`stderr: ${stderr}`);
+	});
+}
+
+function initMagenta(){
+	Max.post('init rnn');
+	const improvRnn = new mm.MusicRNN(MEL_CHECKPOINT);
+    improvRnn.initialize();
+	return improvRnn;
+}
+
 function emmitSeq(seq){
-	var tempo = 120;
-    var division = 4;
-    var ss = new stepSequencer(	tempo, 
-								seq.quantizationInfo.stepsPerQuarter,
- 								seq.notes,
-								seq.totalQuantizedSteps);
     Max.post(seq.quantizationInfo.stepsPerQuarter);
-    ss.on('n', function (step) {
-		Max.post(step);
-		Max.outlet([step.pitch, 127, ( step.quantizedEndStep - step.quantizedStartStep ) ]);
-	})
+    ss.setSequence(seq.quantizationInfo.stepsPerQuarter, seq.notes)
 
 	// Begin playing the sequence
 	ss.play();
@@ -134,20 +155,16 @@ function emmitSeq(seq){
 
 async function runMelodyRnn(ns) {
   // Display the input.
-  Max.post('now really start');
   const qns = mm.sequences.quantizeNoteSequence(ns, 4);
   Max.post('load RNN model');
-  const melodyRnn = new mm.MusicRNN(MEL_CHECKPOINT);
-  Max.post('init rnn');
-  await melodyRnn.initialize();
-
-
-  const continuation = await melodyRnn.continueSequence(qns, 20);
+  
+  const continuation = rnn.continueSequence(qns, 20);
   Max.post("now sequence"); 
   Max.post(continuation);
-  emmitSeq(continuation);
-
-  melodyRnn.dispose();
+  continuation.then (function (continuation){
+	Max.post('now we output');
+  	emmitSeq(continuation);
+  })
   
 }
 
@@ -167,9 +184,6 @@ async function runImprovRnn() {
   // Display the input.
   const qns = mm.sequences.quantizeNoteSequence(MELODY_NS, 4);
   
-  const improvRnn = new mm.MusicRNN(IMPROV_CHECKPOINT);
-  await improvRnn.initialize();
-
   const start = performance.now();
   const continuation = await improvRnn.continueSequence(qns, 20, 1.0, ['Cm']);
   improvRnn.dispose();
@@ -195,6 +209,35 @@ Max.addHandler("bang", () => {
 
 Max.addHandler("note", (pitch, vel) => {
 	Max.post('pitch' + pitch + ' - ' + vel);
-
+	if (vel === 0){
+		ss.noteOff(pitch,performance.now());
+	} else {
+		ss.noteOn(pitch,vel,performance.now());
+	}
 });
-	
+
+Max.addHandler("tic", (pitch, vel) => {
+    ss.advance()
+});
+
+// main
+var tempo = 120;
+var division = 4;
+var ss = new stepSequencer(	tempo, division, 20)
+ 
+ss.on('n', function (step) {
+		Max.post(step);
+		Max.outlet([step.pitch, 127, ( step.quantizedEndStep - step.quantizedStartStep ) ]);
+})
+
+ss.on('o', function (ns) {
+       	runMelodyRnn(ns);
+		
+})
+								
+//seq.totalQuantizedSteps)
+
+startFileServer();
+
+rnn=initMagenta();
+//rnn.dispose();
