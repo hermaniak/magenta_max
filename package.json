@@ -9,8 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@magenta/music": "file:node_modules/@magenta/music",
+    "@tensorflow/tfjs-node": "^0.2.3",
     "browser-env": "^3.2.5",
+    "canvas": "^2.3.1",
     "http-server": "^0.11.1",
     "node-fetch": "^2.3.0",
     "performance-now": "^2.1.0",

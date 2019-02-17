@@ -3,8 +3,10 @@
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var NanoTimer = require('nanotimer');
-var protobuf_1 = require("@magenta/music/es5/protobuf");
+var protobuf_1 = require("../magenta-js/music/es5/protobuf");
 const Max = require('max-api');
+var now = require("performance-now")	
+
 
 
 function start() {
@@ -35,9 +37,10 @@ function loop() {
 
 function checkforEmission() {
   if (this.sequence != undefined && (this.seqIndex < this.sequence.length)){
-  	var seqItem = this.sequence[this.seqIndex];
-    if (this.step === seqItem.quantizedStartStep && 
+	var seqItem = this.sequence[this.seqIndex];
+	if (this.step == seqItem.quantizedStartStep && 
 	  this.seqIndex < this.sequence.length) {
+		Max.post('emmit');
    		this.emit('n', seqItem);
     	this.seqIndex = this.seqIndex + 1;
   	}
@@ -65,9 +68,17 @@ function checkForRecord() {
 async function advance() {
   checkforEmission.call(this)
   if (this._debug){
-	Max.post(' -- ' + this.step + '-' + this.totalSteps + '-' + this.seqIndex 
-		 + '-' + this.onNotes.size + '-' + this.notesIn.length); 
-  }
+	var dl=' -- ' + this.step + '-' + this.totalSteps + '-' + this.seqIndex 
+		 + '-' + this.onNotes.size + '-' + this.notesIn.length;
+	if (this.sequence){
+		dl=dl + ' - ' + this.sequence.length + '-' + this.seqIndex;
+		if (this.sequence[this.seqIndex]) {
+			dl=dl + '-' + this.sequence[this.seqIndex].quantizedStartStep
+			+ '-' + this.sequence[this.seqIndex].quantizedEndStep;
+		}
+	}
+	Max.post(dl);
+  }	
   this.step = (this.step + 1);
   if (this.doLoop && this.step === this.totalSteps ){
 	checkForRecord.call(this)
@@ -103,7 +114,10 @@ function setSequence(division, sequence) {
   this.sequence = sequence;
   this.seqIndex = 0;
   this.timeout = Math.floor((60 / (this.tempo * this.division)) * 10e8) + 'n';
-  if (this._debug){Max.post('set Sequence with length ' + this.sequence);}
+  if (this._debug){
+		Max.post('set Sequence with length ' + this.sequence.length);
+  		Max.post(this.sequence);
+   }
 }
 
 function noteOn(pitch, velocity, timeStamp) {
@@ -149,7 +163,7 @@ function StepSequencer(tempo, division, totalSteps) {
   this.notesIn = [];
   this.onNotes = new Map();
 
-  this.firstNoteTimestamp = performance.now();
+  this.firstNoteTimestamp = now();
 
   
   EventEmitter.call(this);
